@@ -1,5 +1,6 @@
 /*
- *  http://howistart.org/posts/go/1/index.html
+ *  reference : http://howistart.org/posts/go/1/index.html
+
  *  https://home.openweathermap.org/users/sign_up
  *         id : hello-go / hello-go
  *        key : 92740b1767b3711a012f06ca7a9f0013
@@ -295,6 +296,36 @@ func (w weatherUnderground) temperature(city string) (float64, error) {
 type multiWeatherProvider []weatherProvider
 
 func (w multiWeatherProvider) temperature(city string) (float64, error) {
+	temps := make(chan float64, len(w))
+	errs := make(chan error, len(w))
+
+	for _, provider := range w {
+		go func(p weatherProvider) {
+			k, err := p.temperature(city)
+			if err != nil {
+				errs <- err
+				return
+			}
+			temps <- k
+		}(provider)
+	}
+
+	sum := 0.0
+
+	for i := 0; i < len(w); i++ {
+		select {
+		case temp := <-temps:
+			sum += temp
+		case err := <-errs:
+			return 0, err
+		}
+	}
+
+	return sum / float64(len(w)), nil
+}
+
+/*
+func (w multiWeatherProvider) temperature(city string) (float64, error) {
 	sum := 0.0
 
 	for _, provider := range w {
@@ -308,6 +339,7 @@ func (w multiWeatherProvider) temperature(city string) (float64, error) {
 
 	return sum / float64(len(w)), nil
 }
+*/
 
 /*
 func temperature(city string, providers ...weatherProvider) (float64, error) {
